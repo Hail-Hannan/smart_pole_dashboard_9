@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  min-height: 100%;
+  color: #12283a;
+  background-color: #f3f8fa;
+  background-image:
+    radial-gradient(1100px 520px at 0% 0%, #e3f3f1 0%, rgba(227, 243, 241, 0) 70%),
+    radial-gradient(900px 500px at 100% 100%, #eaf1f7 0%, rgba(234, 241, 247, 0) 70%);
+  background-attachment: fixed;
+  font-feature-settings: "cv11", "ss01";
+}
