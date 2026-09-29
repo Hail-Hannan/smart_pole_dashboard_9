@@ -26,7 +26,7 @@ export function DashboardView(props: {
 }) {
   const { envRow, weatherRow, rows, queryStatus, latestTimestamp, updateSeconds, error } = props;
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 sm:px-6">
+    <div className="dash-fit mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 py-6 sm:px-6">
       <Header queryStatus={queryStatus} latestTimestamp={latestTimestamp} />
 
       <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -52,15 +52,15 @@ export function DashboardView(props: {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      <div className="dash-main grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-12 xl:col-span-4"><WindCard weatherRow={weatherRow} rows={rows} /></div>
         <div className="lg:col-span-7 xl:col-span-5"><TrendCard rows={rows} envRow={envRow} /></div>
         <div className="lg:col-span-5 xl:col-span-3"><LightningCard weatherRow={weatherRow} /></div>
       </div>
 
-      <KpiRow envRow={envRow} weatherRow={weatherRow} rows={rows} />
+      <div className="dash-kpi"><KpiRow envRow={envRow} weatherRow={weatherRow} rows={rows} /></div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="dash-bottom grid grid-cols-1 gap-4 md:grid-cols-3">
         <RainActivityCard weatherRow={weatherRow} rows={rows} />
         <LightConditionsCard envRow={envRow} />
         <StationHealthCard queryStatus={queryStatus} envRow={envRow} weatherRow={weatherRow} latestTimestamp={latestTimestamp} />
