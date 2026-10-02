@@ -12,16 +12,24 @@ const TABLE = "sensor_data";
  * Fetch the latest row that looks like an ESP32-A (environmental) reading
  * and the latest row that looks like an ESP32-B (weather) reading, then
  * combine them at the application layer. We deliberately do NOT join on
- * reading_slot, because ESP32-A currently never sets it (see types.ts).
+ * reading_slot (see types.ts).
  *
- * If a future firmware update makes both boards write reading_slot, both
- * rows will naturally share the same reading_slot and isTrulyCombined
- * will reflect that.
+ * TWO-ESP32 FLOW (anemometer separated from the sensor/weather board):
+ *   - Sensor/Weather ESP32 writes one row per cycle holding temperature,
+ *     humidity, light, CO, pressure, rain, lightning and Xweather fields
+ *     (but NEVER wind).
+ *   - Anemometer ESP32 writes its own rows holding ONLY wind_speed and
+ *     wind_direction (every other column NULL).
+ * So wind is fetched with its own "latest row with wind_speed" query and
+ * overlaid onto weatherRow. weatherRow.created_at stays the sensor row's
+ * timestamp, so the lightning "updated ... ago" label and station-health
+ * freshness are unaffected. Nothing is invented: if no wind row exists,
+ * wind stays whatever weatherRow already had (null).
  */
 export async function fetchCombinedLatestReading(): Promise<CombinedReading> {
   const supabase = getSupabaseClient();
 
-  const [envResult, weatherResult] = await Promise.all([
+  const [envResult, weatherResult, windResult] = await Promise.all([
     supabase
       .from(TABLE)
       .select("*")
@@ -36,24 +44,47 @@ export async function fetchCombinedLatestReading(): Promise<CombinedReading> {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from(TABLE)
+      .select("*")
+      .not("wind_speed", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (envResult.error) throw envResult.error;
   if (weatherResult.error) throw weatherResult.error;
+  if (windResult.error) throw windResult.error;
 
   const envRow = envResult.data ?? null;
-  const weatherRow = weatherResult.data ?? null;
+  const sensorWeatherRow = weatherResult.data ?? null;
+  const windRow = windResult.data ?? null;
+
+  // Overlay the anemometer ESP32's latest wind reading onto the weather row.
+  let weatherRow: SensorDataRow | null = sensorWeatherRow;
+  if (windRow) {
+    weatherRow = sensorWeatherRow
+      ? {
+          ...sensorWeatherRow,
+          wind_speed: windRow.wind_speed,
+          wind_direction: windRow.wind_direction,
+        }
+      : windRow;
+  }
 
   const isTrulyCombined = Boolean(
     envRow &&
-      weatherRow &&
+      sensorWeatherRow &&
       envRow.reading_slot !== null &&
-      envRow.reading_slot === weatherRow.reading_slot
+      envRow.reading_slot === sensorWeatherRow.reading_slot
   );
 
-  const timestamps = [envRow?.created_at, weatherRow?.created_at].filter(
-    Boolean
-  ) as string[];
+  const timestamps = [
+    envRow?.created_at,
+    sensorWeatherRow?.created_at,
+    windRow?.created_at,
+  ].filter(Boolean) as string[];
   const latestTimestamp =
     timestamps.length > 0
       ? timestamps.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
@@ -210,17 +241,55 @@ export interface DayRow {
   rain: boolean | null;
 }
 
+const PAGE = 1000; // PostgREST returns at most 1000 rows per request by default
+
 /** All rows from the last `hours` hours (oldest first), only the columns the
- * dashboard's trend chart, gust, pressure-trend and rain-activity need. */
-export async function fetchLastHours(hours = 24, limit = 3000): Promise<DayRow[]> {
+ * dashboard's trend chart, gust, pressure-trend and rain-activity need.
+ *
+ * Two-ESP32 flow: the anemometer ESP32 adds a wind-only row every 10 s on
+ * top of the sensor ESP32's 15 s rows, so one ascending `.limit()` query
+ * would only ever return the OLDEST rows of the window and the chart's
+ * "Now" end would be empty. Instead we read newest-first in parallel pages
+ * and reverse. Wind-only rows are only needed for the 30-minute gust, so
+ * they come from a small separate query rather than the 24 h pages. */
+export async function fetchLastHours(hours = 24, limit = 6500): Promise<DayRow[]> {
   const supabase = getSupabaseClient();
   const since = new Date(Date.now() - hours * 3600_000).toISOString();
-  const { data, error } = await supabase
+  const windSince = new Date(Date.now() - 30 * 60_000).toISOString();
+  const cols = "created_at, temperature, humidity, pressure, wind_speed, rain";
+
+  const pages = Math.max(1, Math.ceil(limit / PAGE));
+  const mainQueries = Array.from({ length: pages }, (_, p) =>
+    supabase
+      .from(TABLE)
+      .select(cols)
+      .gte("created_at", since)
+      // Skip wind-only rows here (every non-wind column NULL).
+      .or("temperature.not.is.null,humidity.not.is.null,pressure.not.is.null,rain.not.is.null")
+      .order("created_at", { ascending: false })
+      .range(p * PAGE, p * PAGE + PAGE - 1)
+  );
+  const windQuery = supabase
     .from(TABLE)
-    .select("created_at, temperature, humidity, pressure, wind_speed, rain")
-    .gte("created_at", since)
-    .order("created_at", { ascending: true })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []) as DayRow[];
+    .select(cols)
+    .gte("created_at", windSince)
+    .is("temperature", null)
+    .is("humidity", null)
+    .is("pressure", null)
+    .is("rain", null)
+    .not("wind_speed", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  const [windRes, ...mainRes] = await Promise.all([windQuery, ...mainQueries]);
+  if (windRes.error) throw windRes.error;
+  for (const r of mainRes) if (r.error) throw r.error;
+
+  const all = [
+    ...mainRes.flatMap((r) => (r.data ?? []) as DayRow[]),
+    ...((windRes.data ?? []) as DayRow[]),
+  ];
+  return all.sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
 }
