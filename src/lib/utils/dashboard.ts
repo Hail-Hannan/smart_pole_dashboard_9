@@ -14,11 +14,6 @@ export const TONE: Record<Severity, { text: string; bg: string; dot: string }> =
   unknown: { text: "#5b6f7e", bg: "#e7eef3", dot: "#94a3b8" },
 };
 
-const RANK: Record<Severity, number> = { unknown: 0, normal: 1, warning: 2, danger: 3 };
-export function worst(...list: Severity[]): Severity {
-  return list.reduce((a, b) => (RANK[b] > RANK[a] ? b : a), "unknown" as Severity);
-}
-
 /** Beaufort scale from m/s. */
 const BEAUFORT = [
   [0.3, "Calm"], [1.6, "Light air"], [3.4, "Light breeze"], [5.5, "Gentle breeze"],
@@ -48,14 +43,6 @@ export function feelsLike(tC: number | null, rh: number | null): number | null {
     0.05481717 * rh * rh + 0.00122874 * t * t * rh + 0.00085282 * t * rh * rh -
     0.00000199 * t * t * rh * rh;
   return (hi - 32) / 1.8;
-}
-
-export function lightDescription(v: number | null): string {
-  if (v === null) return "No reading";
-  if (v >= 60) return "Bright daylight";
-  if (v > 20) return "Daylight";
-  if (v >= 5) return "Low light";
-  return "Dark";
 }
 
 const tz = "Asia/Kuala_Lumpur";
@@ -98,4 +85,16 @@ export function freshnessText(iso: string | null): string {
   if (m < 60) return `${m} minute${m === 1 ? "" : "s"}`;
   const h = Math.floor(m / 60);
   return `${h} hour${h === 1 ? "" : "s"}`;
+}
+
+export function formatClockSeconds(ms: number): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(ms));
+}
+
+export function formatHeaderDateTime(ms: number): string {
+  const d = new Date(ms);
+  const day = new Intl.DateTimeFormat("en-GB", { timeZone: tz, day: "2-digit" }).format(d);
+  const mon = new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short" }).format(d);
+  const year = new Intl.DateTimeFormat("en-GB", { timeZone: tz, year: "numeric" }).format(d);
+  return `${day} ${mon} ${year}   ${formatClockSeconds(ms)}`;
 }

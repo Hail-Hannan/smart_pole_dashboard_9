@@ -1,99 +1,86 @@
 "use client";
 
 import { useMemo } from "react";
-import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { Card, CardTitle } from "@/components/ui/Card";
-import { Pill } from "@/components/ui/Pill";
-import { evaluateHumidity, evaluateTemperature } from "@/lib/utils/thresholds";
-import { formatHourMinute, worst } from "@/lib/utils/dashboard";
+import { LineChart as LineIcon } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { Card } from "@/components/ui/Card";
+import { formatHourMinute, msToKmh } from "@/lib/utils/dashboard";
 import type { DayRow } from "@/lib/supabase/queries";
-import type { SensorDataRow } from "@/lib/supabase/types";
 
 const HOUR = 3600_000;
-const BUCKET = 10 * 60_000;
-const TEMP = "#f9b872";
-const HUM = "#4fd1c5";
+const BUCKET = 15 * 60_000;
+const TEMP = "#ef2b3a";
+const WIND = "#1d6af5";
+const HUM = "#22a559";
+const SOLAR = "#f5b800";
 
-interface Pt { t: number; temp?: number; hum?: number }
+interface Pt { t: number; temp?: number; wind?: number; hum?: number }
 
 function bucketise(rows: DayRow[]): Pt[] {
-  const m = new Map<number, { t: number[]; h: number[] }>();
+  const m = new Map<number, { t: number[]; w: number[]; h: number[] }>();
   for (const r of rows) {
-    if (r.temperature === null && r.humidity === null) continue;
     const k = Math.floor(new Date(r.created_at).getTime() / BUCKET) * BUCKET + BUCKET / 2;
-    const b = m.get(k) ?? { t: [], h: [] };
+    const b = m.get(k) ?? { t: [], w: [], h: [] };
     if (r.temperature !== null) b.t.push(r.temperature);
+    if (r.wind_speed !== null) b.w.push(msToKmh(r.wind_speed));
     if (r.humidity !== null) b.h.push(r.humidity);
     m.set(k, b);
   }
   const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : undefined);
-  return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([t, b]) => ({ t, temp: avg(b.t), hum: avg(b.h) }));
+  return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([t, b]) => ({ t, temp: avg(b.t), wind: avg(b.w), hum: avg(b.h) }));
 }
 
-function domain(vals: number[]): [number, number] {
-  if (!vals.length) return [0, 1];
-  const lo = Math.min(...vals), hi = Math.max(...vals);
-  const pad = Math.max((hi - lo) * 0.45, 1);
-  return [lo - pad, hi + pad];
+function LegendItem({ color, label, off }: { color: string; label: string; off?: boolean }) {
+  return (
+    <span className={`flex items-center gap-1.5 text-[12px] ${off ? "text-[#8a9bb0]" : "text-[#33465e]"}`}>
+      <i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: off ? "#c5d0de" : color }} />
+      {label}
+    </span>
+  );
 }
 
-export function TrendCard({ rows, envRow }: { rows: DayRow[]; envRow: SensorDataRow | null }) {
+export function TrendCard({ rows }: { rows: DayRow[] }) {
   const end = Date.now();
   const start = end - 24 * HOUR;
   const data = useMemo(() => bucketise(rows), [rows]);
-  const tDom = domain(data.map((d) => d.temp).filter((v): v is number => v !== undefined));
-  const hDom = domain(data.map((d) => d.hum).filter((v): v is number => v !== undefined));
-  const first = Math.ceil(start / HOUR) * HOUR;
-  const ticks = [first, first + 6 * HOUR, first + 12 * HOUR, first + 18 * HOUR, end];
-
-  const temp = envRow?.temperature ?? null;
-  const hum = envRow?.humidity ?? null;
-  const sev = worst(evaluateTemperature(temp).severity, evaluateHumidity(hum).severity);
+  const top = Math.max(100, Math.ceil(Math.max(0, ...data.map((d) => d.wind ?? 0)) / 20) * 20);
+  const first = Math.ceil(start / (4 * HOUR)) * 4 * HOUR;
+  const ticks = [0, 1, 2, 3, 4, 5].map((i) => first + i * 4 * HOUR).filter((t) => t <= end);
 
   return (
-    <Card className="flex h-full flex-col">
-      <div className="flex items-start justify-between">
-        <CardTitle>Temperature &amp; humidity · last 24 hours</CardTitle>
-        <Pill severity={sev} />
+    <Card className="h-full gap-1">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 className="flex items-center gap-2 text-[16px] font-bold text-[#0b2a5b]">
+          <LineIcon className="h-5 w-5" /> Environmental Trends (Last 24 Hours)
+        </h2>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <LegendItem color={TEMP} label="Temperature (°C)" />
+          <LegendItem color={WIND} label="Wind Speed (km/h)" />
+          <LegendItem color={SOLAR} label="Solar Radiation (W/m²) · N/A" off />
+          <LegendItem color={HUM} label="Humidity (%)" />
+        </div>
       </div>
 
-      <div className="relative mt-3 min-h-[180px] flex-1">
+      <div className="relative min-h-[120px] flex-1">
         {data.length === 0 ? (
-          <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-[#7a8fa0]">
-            Waiting for readings…
-          </div>
+          <div className="absolute inset-0 flex items-center justify-center text-[12.5px] text-[#8a9bb0]">Waiting for readings…</div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-              <defs>
-                <linearGradient id="tempFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={TEMP} stopOpacity={0.38} />
-                  <stop offset="100%" stopColor={TEMP} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} stroke="#d5e0e6" strokeDasharray="3 5" />
-              <XAxis
-                dataKey="t" type="number" domain={[start, end]} ticks={ticks} allowDataOverflow
-                tickFormatter={(v: number) => (v === ticks[4] ? "Now" : formatHourMinute(v))}
-                axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#5b6f7e" }} tickMargin={10}
-              />
-              <YAxis yAxisId="t" hide domain={tDom} />
-              <YAxis yAxisId="h" hide domain={hDom} />
+            <LineChart data={data} margin={{ top: 6, right: 12, left: -18, bottom: 0 }}>
+              <CartesianGrid stroke="#e3ebf5" />
+              <XAxis dataKey="t" type="number" domain={[start, end]} ticks={ticks} allowDataOverflow tickFormatter={(v: number) => formatHourMinute(v)} tick={{ fontSize: 11, fill: "#475b73" }} axisLine={false} tickLine={false} tickMargin={6} />
+              <YAxis domain={[0, top]} tick={{ fontSize: 11, fill: "#475b73" }} axisLine={false} tickLine={false} />
               <Tooltip
                 labelFormatter={(v: number) => formatHourMinute(v)}
-                formatter={(v: number, name: string) => [name === "temp" ? `${v.toFixed(1)} °C` : `${v.toFixed(0)}%`, name === "temp" ? "Temperature" : "Humidity"]}
-                contentStyle={{ borderRadius: 12, border: "1px solid #e1ebf0", fontSize: 12, boxShadow: "0 8px 24px -12px rgba(20,60,80,.25)" }}
+                formatter={(v: number, name: string) => [name === "temp" ? `${v.toFixed(1)} °C` : name === "wind" ? `${v.toFixed(1)} km/h` : `${v.toFixed(1)} %`, name === "temp" ? "Temperature" : name === "wind" ? "Wind speed" : "Humidity"]}
+                contentStyle={{ borderRadius: 10, border: "1px solid #e1e9f3", fontSize: 12 }}
               />
-              <Area yAxisId="t" dataKey="temp" type="monotone" stroke={TEMP} strokeWidth={2.5} fill="url(#tempFill)" dot={false} connectNulls isAnimationActive={false} />
-              <Line yAxisId="h" dataKey="hum" type="monotone" stroke={HUM} strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
-            </ComposedChart>
+              <Line dataKey="temp" type="monotone" stroke={TEMP} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+              <Line dataKey="wind" type="monotone" stroke={WIND} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+              <Line dataKey="hum" type="monotone" stroke={HUM} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+            </LineChart>
           </ResponsiveContainer>
         )}
-      </div>
-
-      <div className="mt-3 flex items-center gap-6 text-[12px] text-[#3d5363]">
-        <span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TEMP }} />Temperature {temp === null ? "—" : `${temp.toFixed(1)} °C`}</span>
-        <span className="flex items-center gap-2"><i className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: HUM }} />Humidity {hum === null ? "—" : `${hum.toFixed(0)}%`}</span>
       </div>
     </Card>
   );

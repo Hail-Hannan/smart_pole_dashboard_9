@@ -9,9 +9,6 @@ import { useSensorDataRealtime } from "./useSensorDataRealtime";
 type Column =
   | "temperature"
   | "humidity"
-  | "co_ppm"
-  | "light_level"
-  | "pressure"
   | "wind_speed";
 
 interface Point {

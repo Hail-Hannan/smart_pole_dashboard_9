@@ -2,11 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Matrix IoT | Weather & Air Quality",
-  description: "Real-time environmental monitoring dashboard for the Matrix SP-360 Smart Pole.",
+  title: "MATRIX Portable Weather Station",
+  description: "Real-time environmental monitoring dashboard for the MATRIX Portable Weather Station.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#eef6f6" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#f1f6fc" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

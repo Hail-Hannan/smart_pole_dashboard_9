@@ -21,28 +21,6 @@ export function evaluateHumidity(value: number | null): ThresholdResult {
   return { severity: "danger", label: "DANGER" };
 }
 
-export function evaluateLight(value: number | null): ThresholdResult {
-  if (value === null || Number.isNaN(value)) return UNKNOWN;
-  if (value > 20) return { severity: "normal", label: "NORMAL" };
-  if (value >= 5) return { severity: "warning", label: "WARNING" };
-  return { severity: "danger", label: "DANGER" };
-}
-
-/**
- * CO thresholds per spec: <9 NORMAL, 9-35 WARNING, >35 DANGER.
- * IMPORTANT: co_ppm defaults to 0 in the database (NULL DEFAULT 0), so a
- * stored 0 is indistinguishable from "sensor hasn't reported / no reading
- * yet" vs "genuinely reads zero." This function evaluates severity only
- * when given a value; callers must decide separately whether to trust a
- * 0 reading (see co.ts:resolveCoDisplayValue) before calling this.
- */
-export function evaluateCo(value: number | null): ThresholdResult {
-  if (value === null || Number.isNaN(value)) return UNKNOWN;
-  if (value < 9) return { severity: "normal", label: "NORMAL" };
-  if (value <= 35) return { severity: "warning", label: "WARNING" };
-  return { severity: "danger", label: "DANGER" };
-}
-
 export function severityColor(severity: Severity): string {
   switch (severity) {
     case "normal":

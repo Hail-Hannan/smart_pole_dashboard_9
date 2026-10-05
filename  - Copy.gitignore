@@ -1,0 +1,16 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# NOTE: .env.local is intentionally NOT ignored. This project deploys from
+# GitHub to Vercel without dashboard-configured env vars, so .env.local must be
+# committed. It holds only the browser-safe Supabase URL + publishable (anon)
+# key. NEVER add a service_role / secret key to it.
+
+# misc
+.DS_Store
+*.tsbuildinfo
+npm-debug.log*

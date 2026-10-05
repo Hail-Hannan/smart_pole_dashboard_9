@@ -32,7 +32,7 @@ export interface SensorDataRow {
   humidity: number | null;
   light_level: number | null; // bigint
   status: string | null; // ESP32-A's own NORMAL/WARNING/DANGER text
-  co_ppm: number | null; // NULL DEFAULT 0 in DB — see co.ts for handling
+  co_ppm: number | null; // legacy column, no longer displayed
   rain: boolean | null;
   wind_speed: number | null;
   wind_direction: number | null;
@@ -88,16 +88,13 @@ export type Database = {
 export function isEnvironmentalRow(row: SensorDataRow): boolean {
   return (
     row.temperature !== null ||
-    row.humidity !== null ||
-    row.light_level !== null ||
-    row.status !== null
+    row.humidity !== null
   );
 }
 
 /** A row that plausibly came from ESP32-B (weather station). */
 export function isWeatherRow(row: SensorDataRow): boolean {
   return (
-    row.pressure !== null ||
     row.wind_speed !== null ||
     row.wind_direction !== null ||
     row.system_status !== null ||

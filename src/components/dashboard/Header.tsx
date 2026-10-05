@@ -1,51 +1,71 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CalendarDays, MapPin, MoreVertical, Wifi } from "lucide-react";
 import { STATION } from "@/lib/config";
-import { formatStationTime } from "@/lib/utils/dashboard";
-import { TONE } from "@/lib/utils/dashboard";
+import { formatHeaderDateTime } from "@/lib/utils/dashboard";
 import { isDataStale } from "@/lib/utils/format";
 import type { QueryStatus } from "@/hooks/useLatestReading";
 
-const pill =
-  "rounded-xl border border-white/80 bg-white/90 px-4 py-2.5 text-[12.5px] text-[#3d5363] shadow-[0_1px_2px_rgba(20,50,70,0.05),0_6px_16px_-10px_rgba(20,60,80,0.18)]";
+export function MatrixLogo({ size = 30, color = "#0b2a5b" }: { size?: number; color?: string }) {
+  return (
+    <span className="inline-flex items-baseline font-black leading-none tracking-[0.02em]" style={{ fontSize: size, color }}>
+      MATR
+      <span className="relative inline-block">
+        ı<i className="absolute left-1/2 rounded-full bg-[#e11d1d]" style={{ width: size * 0.2, height: size * 0.2, top: -size * 0.04, transform: "translateX(-50%)" }} />
+      </span>
+      X
+    </span>
+  );
+}
 
-export function Header({
-  queryStatus, latestTimestamp,
-}: { queryStatus: QueryStatus; latestTimestamp: string | null }) {
+const box = "flex items-center gap-2.5 rounded-xl border border-[#e1e9f3] bg-white px-3.5 py-2 shadow-[0_1px_2px_rgba(11,42,91,0.04)]";
+
+export function Header({ queryStatus, latestTimestamp }: { queryStatus: QueryStatus; latestTimestamp: string | null }) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const stale = isDataStale(latestTimestamp);
   const online = queryStatus === "success" && !stale;
-  const label = queryStatus === "error" ? "STATION OFFLINE" : queryStatus !== "success" ? "CONNECTING" : stale ? "NO RECENT DATA" : "STATION ONLINE";
-  const dot = online ? TONE.normal.dot : queryStatus === "error" ? TONE.danger.dot : TONE.warning.dot;
+  const label = queryStatus === "error" ? "Offline" : queryStatus !== "success" ? "Connecting" : stale ? "No recent data" : "Online";
+  const bg = online ? "#22a559" : queryStatus === "error" ? "#e11d1d" : "#f28c1b";
 
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3.5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[#1f9d8c] text-[22px] font-semibold leading-none text-[#1f9d8c]">
-          M
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 pb-1 pt-3">
+      <div className="flex min-w-0 items-center gap-5">
+        <div className="leading-none">
+          <MatrixLogo />
+          <div className="mt-1 text-[16px] font-bold leading-none text-[#0b2a5b]">{STATION.product}</div>
         </div>
-        <div>
-          <div className="text-[13px] font-bold tracking-[0.22em] text-[#1b7f72]">{STATION.platform}</div>
-          <div className="text-[11px] tracking-[0.06em] text-[#5b6f7e]">{STATION.platformTagline}</div>
+        <div className="hidden border-l border-[#d5e0ee] pl-5 text-[15px] leading-snug text-[#0b2a5b] lg:block">
+          {STATION.taglineLines.map((l) => <div key={l}>{l}</div>)}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className={`${pill} flex items-center gap-2 uppercase tracking-[0.04em]`}>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dot }} />
+      <div className="flex items-center gap-3">
+        <div className={`${box} hidden md:flex`}>
+          <MapPin className="h-5 w-5 text-[#0b2a5b]" />
+          <div className="leading-tight">
+            <div className="text-[10.5px] text-[#5d7088]">Site Location</div>
+            <div className="text-[13px] font-medium text-[#0b2a5b]">{STATION.location}</div>
+          </div>
+        </div>
+        <div className={`${box} hidden sm:flex`}>
+          <CalendarDays className="h-5 w-5 text-[#0b2a5b]" />
+          <div className="leading-tight">
+            <div className="text-[10.5px] text-[#5d7088]">Date &amp; Time</div>
+            <div className="min-w-[150px] whitespace-pre text-[13px] font-medium text-[#0b2a5b]">{now === null ? " " : formatHeaderDateTime(now)}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-semibold text-white" style={{ backgroundColor: bg }}>
+          <Wifi className="h-4 w-4" />
           {label}
         </div>
-        <div className={pill}>Last update: {formatStationTime(latestTimestamp)}</div>
-        <div className={`${pill} relative flex items-center`}>
-          <select
-            aria-label="Station"
-            className="cursor-pointer appearance-none bg-transparent pr-7 outline-none"
-            defaultValue="s1"
-          >
-            <option value="s1">{STATION.stationName}</option>
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-3.5 h-4 w-4 text-[#3d5363]" />
-        </div>
+        <MoreVertical className="h-5 w-5 text-[#0b2a5b]" aria-hidden />
       </div>
     </header>
   );

@@ -1,12 +1,8 @@
-/** Static station identity shown in the header. Edit freely. */
+/** Static station identity shown in the header and footer. Edit freely. */
 export const STATION = {
-  platform: "MATRIX IOT",
-  platformTagline: "ENVIRONMENTAL MONITORING PLATFORM",
-  title: "Weather & Air Quality",
+  product: "Portable Weather Station",
+  taglineLines: ["Real-time Environmental Monitoring", "For Safer Communities, Operations and Events"],
   location: "Petaling Jaya, Selangor",
-  stationName: "Station 01 · Outdoor",
-  footerLeft: "Matrix IoT Solutions Sdn Bhd · SP-360 Smart Pole Dashboard",
-  footerRight: "Status colours follow the sensor thresholds configured in this project.",
-  /** Small unit shown after the light reading. The sensor reports a 0–100 level, not lux. */
-  lightUnit: "/100",
+  company: "Matrix IoT Solutions Sdn Bhd",
+  footerTagline: ["Smart Monitoring", "Safer People", "Smarter Operations", "A More Resilient Tomorrow"],
 };
